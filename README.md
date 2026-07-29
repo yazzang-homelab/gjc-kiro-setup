@@ -8,6 +8,52 @@
 
 ---
 
+## 0. 먼저: 크레딧은 캘린더 월 경계에서 사라집니다
+
+`getUsageLimits` 응답의 `nextDateReset` 은 가입 기념일이 아니라 **다음 달 1일 00:00 UTC** 입니다.
+실측값이 정확히 월 경계에 떨어집니다.
+
+```
+"daysUntilReset": 0
+"nextDateReset" : 1785542400   → 2026-08-01 00:00 UTC
+```
+
+공식 요금제 문서도 동일하게 안내합니다.
+
+> Usage limits reset at the start of each billing month.
+> Unused credits do not roll over to the next month.
+
+| 종류 | 이월 | 만료 |
+|---|---|---|
+| 플랜 기본 크레딧 | 없음 | 매월 1일 소멸 |
+| 추가 구매 크레딧 | 있음 | 구매일로부터 12개월 |
+
+따라서 **월말에 결제하면 며칠 만에 그 달치 전량을 받고, 1일에 다시 전량으로 초기화**됩니다.
+앞의 배분은 유효기간이 며칠뿐이므로, 그 안에 쓰지 않으면 그대로 0이 됩니다.
+
+### 배수가 처리량을 결정합니다
+
+크레딧은 요청 수가 아니라 `rateMultiplier × 요청 수` 로 차감됩니다.
+
+| 모델 | 배수 | 10,000 크레딧 환산 |
+|---|---:|---:|
+| gpt-5.6-sol | 2.4 | 4,166 |
+| claude-opus-5 | 2.2 | 4,545 |
+| claude-sonnet-5 | 1.3 | 7,692 |
+| gpt-5.6-luna | 0.6 | 16,666 |
+| glm-5 | 0.5 | 20,000 |
+| deepseek-3.2 | 0.25 | 40,000 |
+| minimax-m2.1 | 0.15 | 66,666 |
+| qwen3-coder-next | 0.05 | **200,000** |
+
+같은 크레딧으로 4,545회를 쓸 수도, 200,000회를 쓸 수도 있습니다.
+문제는 크레딧을 다 못 쓰는 것이 아니라 **비싼 레인으로 싼 일을 하는 것**입니다.
+
+> 이 문서가 다루는 것은 본인이 결제한 구독을 유효기간 안에 제대로 쓰는 방법입니다.
+> 계정 공유, 크레딧 재판매, 다중 계정 순환은 이용약관 위반이며 범위 밖입니다.
+
+---
+
 ## 1. 핵심: Kiro 계정은 두 종류입니다
 
 | 구분 | AWS Builder ID | app.kiro.dev 계정 |
@@ -161,6 +207,22 @@ profiles:
 토큰을 가장 많이 소모하는 `executor` 레인을 저배수 모델로 돌리는 것이 핵심입니다.
 상위 모델과 최저 배수 모델의 차이는 40배가 넘습니다.
 
+월말처럼 곧 소멸할 크레딧이 남았다면 평소 아끼던 상위 레인을 여는 프리셋을 따로 둡니다.
+
+```yaml
+  kiro-monthend:
+    required_providers: [kiro]
+    model_mapping:
+      default:   kiro/claude-opus-5:high
+      executor:  kiro/claude-opus-5:high      # 평소엔 0.05 로 두던 자리
+      planner:   kiro/gpt-5.6-sol:high
+      architect: kiro/claude-opus-5:high
+      critic:    kiro/claude-opus-4.8:high
+```
+
+단, 소진 자체가 목적이 되면 안 됩니다. 밀린 리팩터링, 테스트 보강, 문서화처럼
+**결과가 저장소에 남는 작업**에만 붙이십시오.
+
 ### 검증
 
 ```bash
@@ -197,6 +259,10 @@ claude-(opus|sonnet|haiku)-(\d+)-(\d{1,2})\b  →  claude-$1-$2.$3
 |---|---|
 | `kiro-login.sh` | 계정 등록 · 비활성화 · 상태 확인 헬퍼 |
 | `gen_kiro_models.py` | 업스트림 권한 기반 `models.yml` 블록 생성기 |
+
+## 웹 가이드
+
+같은 내용을 초보자용 / 오케스트레이션용으로 나눈 문서: <https://leesayah.duckdns.org/kiro-identity.html>
 
 ## 라이선스
 
