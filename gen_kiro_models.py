@@ -104,14 +104,17 @@ def emit(models: list[dict]) -> str:
         add(f"      - id: {mid}")
         add(f"        name: {LABEL} {name} · kiro (rate {rate})")
         if is_reasoning(mid):
+            # 상위 배수 모델은 최대 강도까지 노출한다. 소진 및 고난도 레인이 쓴다.
+            levels = ("low", "medium", "high", "xhigh") if (rate or 0) >= 2.0 \
+                else ("low", "medium", "high")
             add("        reasoning: true")
             add("        thinking: ")
-            add("          minLevel: low")
-            add("          maxLevel: high")
+            add(f"          minLevel: {levels[0]}")
+            add(f"          maxLevel: {levels[-1]}")
             add("          mode: effort")
             add("          defaultLevel: medium")
             add("          levels: ")
-            for lvl in ("low", "medium", "high"):
+            for lvl in levels:
                 add(f"            - {lvl}")
         else:
             add("        reasoning: false")
