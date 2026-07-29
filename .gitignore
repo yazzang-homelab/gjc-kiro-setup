@@ -1,0 +1,6 @@
+*.bak-*
+__pycache__/
+data/
+admin-password.txt
+*.key
+.env
