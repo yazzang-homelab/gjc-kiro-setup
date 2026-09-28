@@ -34,6 +34,7 @@ LABEL = "【Kiro】"
 
 BLOCK_START = re.compile(r"^  kiro:\s*$")
 NEXT_TOP = re.compile(r"^(\S|  [a-z0-9-]+:)")
+PROVIDERS = re.compile(r"^providers:\s*$")
 
 
 def admin_password() -> str:
@@ -139,14 +140,24 @@ def apply(path: str, block: str) -> None:
         if BLOCK_START.match(line.rstrip("\n")):
             start = i
             break
-    if start is None:
-        sys.exit(f"{path} 에서 '  kiro:' 블록을 찾지 못했습니다.")
 
-    end = len(lines)
-    for j in range(start + 1, len(lines)):
-        if NEXT_TOP.match(lines[j]):
-            end = j
-            break
+    if start is None:
+        # kiro 블록이 아직 없으면 providers 섹션 맨 앞에 새로 넣는다.
+        # (프로바이더를 처음 등록할 때, 또는 계정 정지로 블록을 걷어냈다가 되살릴 때)
+        anchor = None
+        for i, line in enumerate(lines):
+            if PROVIDERS.match(line.rstrip("\n")):
+                anchor = i + 1
+                break
+        if anchor is None:
+            sys.exit(f"{path} 에 'providers:' 섹션이 없습니다.")
+        start = end = anchor
+    else:
+        end = len(lines)
+        for j in range(start + 1, len(lines)):
+            if NEXT_TOP.match(lines[j]):
+                end = j
+                break
 
     backup = f"{path}.bak-{time.strftime('%Y%m%d-%H%M%S')}-genkiro"
     shutil.copy2(path, backup)
